@@ -3,7 +3,6 @@ body {
 }
 
 #playerOverlay {
-  // background-color: black;
   position: absolute;
   top: 0;
   left: 0;
@@ -15,7 +14,7 @@ body {
 
 #map {
   transform: rotate(90deg) scale(1, -1);
-  clip-path: url(#playerClip);
+  //clip-path: url(#playerClip);
 }
 // svg {
 //   background-color: black;

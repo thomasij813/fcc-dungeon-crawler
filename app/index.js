@@ -117,22 +117,31 @@ class Main extends React.Component {
   constructor() {
     super()
     this.state = {
-      map: []
+      map: [],
+      darkness: true
     }
   }
 
   componentWillMount() {
-    let map = createMap(125)
+    let map = createMap(150)
     map = cleanMap(map, 3)
     this.setState({
       map: map
     })
   }
 
+  toggleDarkness() {
+    this.setState({
+      darkness: !this.state.darkness
+    })
+  }
+
   render() {
     return (
       <div>
-        <Map map={this.state.map} />
+        <Map map={this.state.map}
+          darkness={this.state.darkness}
+          toggleDarkness={this.toggleDarkness.bind(this)} />
         <PlayerOverlay map={this.state.map}/>
       </div>
     )
@@ -142,7 +151,9 @@ class Main extends React.Component {
 class PlayerOverlay extends React.Component {
   constructor(props) {
     super(props)
-    this.state = {}
+    this.state = {
+      player: {}
+    }
   }
 
   componentWillMount() {
@@ -215,18 +226,18 @@ class PlayerOverlay extends React.Component {
   render() {
     let length = this.props.map[0].length
     return (
-      <svg id="playerOverlay" width={length * 10} height={length * 10}>
+      <svg id="playerOverlay" width={length * 5} height={length * 5}>
 
         <defs>
           <clipPath id="playerClip">
-              <circle cx={this.state.player.position[0] * 10 + 5}
-                cy={this.state.player.position[1] * 10 + 5} r="60"
+              <circle cx={this.state.player.position[0] * 5 + 2.5}
+                cy={this.state.player.position[1] * 5 + 2.5} r="40"
                 fill="black"/>
             </clipPath>
         </defs>
         <rect
-          x={this.state.player.position[0] * 10} y={this.state.player.position[1] * 10}
-          height="10" width="10"
+          x={this.state.player.position[0] * 5} y={this.state.player.position[1] * 5}
+          height="5" width="5"
           fill="white"/>
       </svg>
     )
@@ -234,14 +245,27 @@ class PlayerOverlay extends React.Component {
 }
 
 function Map(props) {
+  function handleDarknessToggle(e) {
+    e.preventDefault()
+    props.toggleDarkness()
+  }
+
   let length = props.map[0].length
   let rows = props.map.map((tilesArray, index) => {
     return <Row tiles={tilesArray} y={index} key={index}/>
   })
+
   return (
-    <svg id="map" width={length * 10} height={length * 10}>
-      {rows}
-    </svg>
+    <div>
+      <svg id="map" width={length * 5} height={length * 5}
+        style={props.darkness ? {clipPath: 'url(#playerClip)'} : null}>
+          {rows}
+      </svg>
+      <button style={{display:'block'}}
+        onClick={handleDarknessToggle}>
+          Toggle Darkness
+      </button>
+    </div>
   )
 }
 
@@ -263,8 +287,8 @@ function Tile(props) {
 
   return (
     <rect
-      x={props.x * 10} y={props.y * 10}
-      height="10" width="10"
+      x={props.x * 5} y={props.y * 5}
+      height="5" width="5"
       fill={evaluateFill(props.habitable)}>
     </rect>
   )
