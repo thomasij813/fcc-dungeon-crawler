@@ -1,0 +1,22 @@
+body {
+  margin: 0
+}
+
+#playerOverlay {
+  // background-color: black;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#playerClip {
+  transform: rotate(90deg) scale(1, -1);
+}
+
+#map {
+  transform: rotate(90deg) scale(1, -1);
+  clip-path: url(#playerClip);
+}
+// svg {
+//   background-color: black;
+// }
