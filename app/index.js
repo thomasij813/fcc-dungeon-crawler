@@ -117,7 +117,7 @@ class Monster extends Creature{
     super(position, type)
       this.type = type
       this.level = level
-      this.health = 30 + (level * 10)
+      this.health = 30 + (level * 15)
   }
 
   attack() {
@@ -157,7 +157,8 @@ class Main extends React.Component {
     this.state = {
       map: [],
       darkness: true,
-      playing: true
+      playing: true,
+      win: false
     }
   }
 
@@ -175,9 +176,16 @@ class Main extends React.Component {
     })
   }
 
-  endGame() {
+  loseGame() {
     this.setState({
-      playing: false
+      playing: false,
+    })
+  }
+
+  winGame() {
+    this.setState({
+      playing: false,
+      win: true
     })
   }
 
@@ -189,11 +197,15 @@ class Main extends React.Component {
             darkness={this.state.darkness}
             toggleDarkness={this.toggleDarkness.bind(this)} />
             <Overlay map={this.state.map} darkness={this.state.darkness}
-              endGame={this.endGame.bind(this)}/>
+              playing={this.state.playing}
+              lose={this.loseGame.bind(this)}
+              win={this.winGame.bind(this)}/>
         </div>
       )
-    } else {
+    } else if (!this.state.win){
       return <h1 style={{color: 'white'}}>Game Over!</h1>
+    } else {
+      return <h1 style={{color: 'white'}}>You won!</h1>
     }
 
   }
@@ -204,7 +216,8 @@ class Overlay extends React.Component {
     super(props)
     this.state = {
       player: {},
-      playerHealth: 100,
+      boss: {},
+      playerHealth: 150,
       playerWeapon: {name: 'Bare Fists', rank: 0},
       playerBaseAttack: 15,
       playerLevel: 1,
@@ -291,8 +304,22 @@ class Overlay extends React.Component {
       count++
     }
 
+    let boss = new Monster([0,0], 'boss', 7)
+    boss.randomizeStartPosition(this.props.map)
+    while (!this.ensureValidPosition(boss.position, takenPositions)) {
+      boss = new Monster([0,0], 'boss', 7)
+      boss.randomizeStartPosition(this.props.map)
+    }
+
+    takenPositions.push(boss.position)
+
+    // remove the player position from the takenPositions; this will allow the player
+    // to pass over its spawn potionInteraction
+    takenPositions.shift()
+
     this.setState({
       player: player,
+      boss: boss,
       potions: potions,
       weapons: weapons,
       monsters: monsters,
@@ -307,17 +334,8 @@ class Overlay extends React.Component {
     return takenPositionCount === 0
   }
 
-  componentDidMount() {
-    window.addEventListener('keydown', this.handleKeyPress.bind(this))
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener('keydown', this.handleKeyPress.bind(this))
-  }
-
   handleKeyPress(e) {
     e.preventDefault()
-
     let boundary = this.props.map[0].length - 1
 
     function calcSub(num) {
@@ -375,7 +393,6 @@ class Overlay extends React.Component {
     // interaction
     if (newPosition && !this.ensureValidPosition(newPosition, this.state.takenPositions)) {
       let interaction = this.determineInteraction(newPosition)
-      console.log(interaction)
 
       if (interaction.type === 'potion') {
         this.handlePotion(interaction)
@@ -388,12 +405,17 @@ class Overlay extends React.Component {
       if (interaction.type === 'monster') {
         this.handleMonsterInteraction(interaction)
       }
+
+      if (interaction.type === 'boss') {
+        this.handleBossInteraction(interaction)
+      }
     }
   }
 
   determineInteraction(playerPosition) {
     //concat all interaction arrays and filter them to the item in question
     let interactions = this.state.weapons.concat(this.state.potions).concat(this.state.monsters)
+    interactions = [...interactions, this.state.boss]
     let interactionFilter = interactions.filter(interaction => {
       return playerPosition[0] === interaction.position[0] &&
       playerPosition[1] === interaction.position[1]
@@ -464,7 +486,7 @@ class Overlay extends React.Component {
     let newWeapon = {name: weapons[newWeaponRank], rank: newWeaponRank}
 
     // calculate new attack
-    let newBaseAttack = (newWeaponRank * newWeaponRank) + 20 + this.state.playerBaseAttack
+    let newBaseAttack = (newWeaponRank * 4) + this.state.playerBaseAttack
 
     // update weapons
     let newWeapons = this.newInteractionsArray(this.state.weapons, weaponInteraction)
@@ -486,12 +508,11 @@ class Overlay extends React.Component {
 
   handleMonsterInteraction(monsterInteraction) {
     let monster = monsterInteraction
-    console.log(monster)
 
     let playerAttack = this.playerAttack()
     let monsterAttack = monster.attack()
     monster.receiveDamage(playerAttack)
-    //let newPlayerHealth = this.state.playerHealth - monsterAttack
+    this.playerTakeDamage(monsterAttack)
 
     let newXP = this.state.playerXP
     let newMonsters = this.state.monsters.slice()
@@ -501,25 +522,36 @@ class Overlay extends React.Component {
     if (monster.health <= 0) {
       newMonsters = this.newInteractionsArray(newMonsters, monsterInteraction)
       newTakenPositions = this.newTakenPositions(newTakenPositions, monsterInteraction)
-      newXP = this.state.playerXP + 10
+      this.playerIncreaseXP(monster.level)
     }
 
     this.setState({
       monsters: newMonsters,
       takenPositions: newTakenPositions,
-      playerXP: newXP
     })
+  }
 
-    this.playerTakeDamage(monsterAttack)
+  handleBossInteraction(bossInteraction) {
+    let boss = bossInteraction
+    let playerAttack = this.playerAttack()
+    let bossAttack = boss.attack()
+    boss.receiveDamage(playerAttack)
+    this.playerTakeDamage(bossAttack)
+
+    if (boss.health <= 0) {
+      this.props.win()
+    }
   }
 
   playerTakeDamage(damage) {
-    let newPlayerHealth = this.state.playerHealth - damage
-    console.log("You're taking damage: " + damage)
-    console.log("You're current health is now " + newPlayerHealth)
+    let defenseBase = (this.state.playerLevel) * 3 + 5
+    let defenseModifier = parseInt(Math.random() * defenseBase)
+    let defendedDamage = (damage - defenseModifier >= 0) ? damage - defenseModifier : 0
+    let newPlayerHealth = this.state.playerHealth - defendedDamage
+
     if (newPlayerHealth <= 0) {
       //window.removeEventListener('keydown', this.handleKeyPress.bind(this))
-      this.props.endGame()
+      this.props.lose()
     } else {
       this.setState({
         playerHealth: newPlayerHealth
@@ -527,9 +559,51 @@ class Overlay extends React.Component {
     }
   }
 
+  playerIncreaseXP(monsterLevel) {
+    let currentXP = this.state.playerXP
+    let currentPlayerLevel = this.state.playerLevel
+    let levelDifference = monsterLevel - currentPlayerLevel
+
+    let newXP = currentXP + 10
+    if (levelDifference >= 0) {
+      let XPIncrease = (levelDifference * 10) + 20
+      newXP += XPIncrease
+    }
+
+    if (currentPlayerLevel === 1 && newXP >= 40) {
+      this.playerIncreaseLevel(2)
+    }
+
+    if (currentPlayerLevel === 2 && newXP >= 80) {
+      this.playerIncreaseLevel(3)
+    }
+
+    if (currentPlayerLevel === 3 && newXP >= 130) {
+      this.playerIncreaseLevel(4)
+    }
+
+    if (currentPlayerLevel === 4 && newXP >= 180) {
+      this.playerIncreaseLevel(5)
+    }
+
+    this.setState({
+      playerXP: newXP
+    })
+  }
+
+  playerIncreaseLevel(newLevel) {
+    newLevel = newLevel > 5 ?  5 : newLevel
+    let healthIncrease = (60)
+    let newHealth = this.state.playerHealth + healthIncrease
+    this.setState({
+      playerLevel: newLevel,
+      playerHealth: newHealth
+    })
+  }
+
   playerAttack() {
     //base attack is modified when the player's weapon increases
-    let modifier = parseInt(Math.random() * (this.state.playerLevel * 12))
+    let modifier = parseInt(Math.random() * (this.state.playerLevel * 5))
     return modifier + this.state.playerBaseAttack
   }
 
@@ -537,51 +611,73 @@ class Overlay extends React.Component {
     let length = this.props.map.length
 
     let potionSprites = this.state.potions.map((potion, index) => {
-      return <Sprite className="potion" position={potion.position} fill='green' key={index} />
+      return <Sprite className="potion" position={potion.position} key={index} />
     })
 
     let weaponSprites = this.state.weapons.map((weapon, index) => {
-      return <Sprite className="weapon" position={weapon.position} fill='goldenrod' key={index} />
+      return <Sprite className="weapon" position={weapon.position} key={index} />
     })
 
     let monsterSprites = this.state.monsters.map((monster, index) => {
-      return <Sprite className="monster" position={monster.position} fill='red' key={index} />
+      return <Sprite className={"monster" + monster.level} position={monster.position} key={index} />
     })
 
-    console.log('x: ' + this.state.player.position[0] + ', y: ' + this.state.player.position[1])
     return (
-      <svg id="Overlay" className="svgOverlay"
-        width={length * 5} height={length * 5}
-        style={this.props.darkness ? {clipPath: 'url(#playerClip)'} : null}>
+      <div>
+        <svg id="Overlay" className="svgOverlay"
+          width={length * 5} height={length * 5}
+          style={this.props.darkness ? {clipPath: 'url(#playerClip)'} : null}>
 
-        <defs>
-          <clipPath id="playerClip">
-              <circle cx={this.state.player.position[0] * 5 + 2.5}
-                cy={this.state.player.position[1] * 5 + 2.5} r="40"
-                fill="black"/>
-            </clipPath>
-        </defs>
+          <defs>
+            <clipPath id="playerClip">
+                <circle cx={this.state.player.position[0] * 5 + 2.5}
+                  cy={this.state.player.position[1] * 5 + 2.5} r="40"
+                  fill="black"/>
+              </clipPath>
+          </defs>
 
-        <Sprite position={this.state.player.position} fill='blue'/>
+          <PlayerSprite position={this.state.player.position} handleKeyPress={this.handleKeyPress.bind(this)}/>
+          <Sprite className="boss" position={this.state.boss.position} />
 
-        <g className="potionsGroup">
-          {potionSprites}
-        </g>
-        <g className="weaponsGroup">
-          {weaponSprites}
-        </g>
-        <g className="monstersGroup">
-          {monsterSprites}
-        </g>
-      </svg>
+          <g className="potionsGroup">
+            {potionSprites}
+          </g>
+          <g className="weaponsGroup">
+            {weaponSprites}
+          </g>
+          <g className="monstersGroup">
+            {monsterSprites}
+          </g>
+        </svg>
+        <StatusDisplay
+          health={this.state.playerHealth}
+          weapon={this.state.playerWeapon}
+          level={this.state.playerLevel}/>
+      </div>
     )
   }
+}
+
+class PlayerSprite extends React.Component {
+  componentDidMount() {
+    window.addEventListener('keydown', this.props.handleKeyPress)
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.props.handleKeyPress)
+  }
+
+  render() {
+    return <Sprite position={this.props.position} fill='blue' className='player'/>
+  }
+
 }
 
 function Sprite(props) {
   return (
     <rect x={props.position[0] * 5} y={props.position[1] * 5}
-      height="5" width="5" fill={props.fill}/>
+      height="5" width="5"
+      className={props.className || ''}/>
   )
 }
 
@@ -623,7 +719,7 @@ function Row(props) {
 
 function Tile(props) {
   function evaluateFill(habitable) {
-    return habitable ? 'white' : 'black'
+    return habitable ? 'gainsboro' : 'darkslategray'
   }
 
   return (
@@ -632,6 +728,16 @@ function Tile(props) {
       height="5" width="5"
       fill={evaluateFill(props.habitable)}>
     </rect>
+  )
+}
+
+function StatusDisplay(props) {
+  return (
+    <div className="status-display">
+      <p>Health: {props.health}</p>
+      <p>Weapon: {props.weapon.name}</p>
+      <p>Level: {props.level}</p>
+    </div>
   )
 }
 

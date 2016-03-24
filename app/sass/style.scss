@@ -3,24 +3,49 @@ body {
   background-color: black;
 }
 
+.monster0 {
+  fill: pink
+}
+
+.monster1{
+  fill: lighten(red, 25%)
+}
+
+.monster2 {
+  fill: lighten(red, 15%)
+}
+
+.monster3 {
+  fill: red
+}
+
+.monster4 {
+  fill: darken(red, 15%)
+}
+
+.potion {
+  fill: lighten(green, 30%)
+}
+
+.weapon {
+  fill: goldenrod
+}
+
+.player{
+  fill: blue
+}
+
+.boss{
+  fill: black;
+  stroke: red;
+}
+
 .svgOverlay {
   position: absolute;
   top: 30px;
   left: 30px;
 }
 
-#playerClip {
+.status-display{
+  color: white;
 }
-
-#nonPlayerOverlay {
-  //clip-path: url(#playerClip);
-  // transform: rotate(90deg) scale(1, -1);
-}
-
-#map {
-  //transform: rotate(90deg) scale(1, -1);
-  //clip-path: url(#playerClip);
-}
-// svg {
-//   background-color: black;
-// }
